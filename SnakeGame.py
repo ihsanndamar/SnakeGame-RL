@@ -209,6 +209,8 @@ class SnakeGame:
         # Frame Per Second /Refresh Rate
         self.fps.tick(self.game_state.snake_speed)
 
+        return self.game_state.get_game_state()
+
     def run(self):
         while True:
             # handling key events

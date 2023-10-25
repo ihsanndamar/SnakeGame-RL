@@ -1,12 +1,13 @@
 import os
 
+from keras.optimizers import RMSprop
+
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import random
 import numpy as np
 from collections import deque
 from keras.models import Model, load_model
 from keras.layers import Input, Dense
-from keras.optimizers import RMSprop
 
 
 
@@ -15,11 +16,12 @@ from keras.optimizers import RMSprop
 class NeuralNetworkModel:
 
     def __init__(self, input_shape, action_space):
-        self.model = self.Create(input_shape, action_space)
+        self.input_shape = input_shape
+        self.action_space = action_space
+        self.model = self._create_model(input_shape, action_space)
 
 
-
-    def Create(self, input_shape, action_space):
+    def _create_model(self, input_shape, action_space):
         X_input = Input(input_shape)
 
         # 'Dense' is the basic form of a neural network layer
@@ -40,4 +42,9 @@ class NeuralNetworkModel:
 
         model.summary()
         return model
+
+
+
+
+
 

@@ -5,16 +5,21 @@ from keras.models import Model, load_model
 from SnakeGame import SnakeGame
 from NeuralNetworkModel import NeuralNetworkModel
 
+
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
 LR = 0.001
 
+
 class DQNAgent:
     def __init__(self):
         self.n_games = 0
-        self.epsilon = 0    # randomness
-        self.gamma = 0.9    # discount rate
+        self.epsilon = 0  # randomness
+        self.gamma = 0.9  # discount rate
         self.memory = deque(maxlen=MAX_MEMORY)  # popleft()
+
+        self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
+
 
     def get_state(self, game):
         game_state = game.game_state
@@ -41,13 +46,13 @@ class DQNAgent:
         return np.array(state, dtype=np.float32)
 
     def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done)) # popleft if MAX_MEMORY is reached
+        self.memory.append((state, action, reward, next_state, done))  # popleft if MAX_MEMORY is reached
 
     def train_long_memory(self):
         pass
 
     def train_short_memory(self, state, action, reward, next_state, done):
-        pass
+        self.trainer.train_step(state, action, reward, next_state, done)
 
     def get_action(self, state):
         self.epsilon = 80 - self.n_games
@@ -56,13 +61,12 @@ class DQNAgent:
             move = random.randint(0, 2)
             final_move[move] = 1
         else:
-            state0 = np.array(state, dtype=np.float32)
-            prediction = NeuralNetworkModel.model.predict(state0.reshape((1, 22)))
-            move = np.argmax(prediction[0])
-            final_move[move] = 1
+            model = NeuralNetworkModel(input_shape=(19,), action_space=4).model
+            move = np.argmax(model.predict(state.reshape(1, -1)))
+            if 0 <= move < 3:
+                final_move[move] = 1
 
         return final_move
-
 
 
 def train():
@@ -83,13 +87,6 @@ def train():
         agent.train_short_memory(state_old, action, reward, state_new, done)
 
         agent.remember(state_old, action, reward, state_new, done)
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
