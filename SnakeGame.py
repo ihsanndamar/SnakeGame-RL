@@ -1,6 +1,11 @@
 # importing libraries
+import time
+
 import pygame
 import random
+
+# Initialising pygame
+pygame.init()
 
 game_name = 'Snake Game @ Python'
 black = pygame.Color(0, 0, 0)
@@ -29,7 +34,12 @@ class SnakeGameState:
         self.snake_position = [100, 50]
         self.fruit_position = [random.randrange(1, (self.window_x // 10)) * 10,
                                random.randrange(1, (self.window_y // 10)) * 10]
-        self.game_over = False
+        self.is_game_over = False
+        self.reward = 0
+
+    def reset_reward(self):
+        self.reward = 0
+        return self
 
     def update_snake_position(self, snake_position):
         self.snake_position = snake_position
@@ -39,17 +49,22 @@ class SnakeGameState:
         self.fruit_position = fruit_position
         return self
 
-    def update_score(self, score):
-        self.score = score
+    def add_to_score(self):
+        self.reward = 10
+        self.score += 1
+        return self
+
+    def game_over(self):
+        self.is_game_over = True
+        self.reward = -10
         return self
 
     def update_direction(self, direction):
         self.direction = direction
         return self
 
-    def game_over(self):
-        self.game_over = True
-        return self
+    def get_game_state(self):
+        return self.reward, self.is_game_over, self.score
 
     def __str__(self):
         return "SnakeGameState: snake_position=" + str(self.snake_position) + ", fruit_position=" \
@@ -59,10 +74,7 @@ class SnakeGameState:
 class SnakeGame:
     def __init__(self):
         self.game_state = SnakeGameState()
-        self.reward = 0
 
-        # Initialising pygame
-        pygame.init()
         # Initialise game window
         pygame.display.set_caption(game_name)
         self.game_window = pygame.display.set_mode((self.game_state.window_x, self.game_state.window_y))
@@ -88,6 +100,9 @@ class SnakeGame:
         self.game_window.blit(score_surface, score_rect)
         
     def game_over(self):
+
+        self.game_state.game_over()
+
         # creating font object my_font
         my_font = pygame.font.SysFont('times new roman', 50)
 
@@ -108,103 +123,116 @@ class SnakeGame:
         pygame.display.flip()
 
         # after 2 seconds we will quit the program
-        # time.sleep(2)
+        time.sleep(2)
 
-        # deactivating pygame library
-        pygame.quit()
+        return self.game_state.get_game_state()
 
-        # self.run_game()
+    def _move_snake(self, action):
+        # If two keys pressed simultaneously
+        # we don't want snake to move into two
+        # directions simultaneously
 
-    def play_step(self):
+        if action == 'UP' and self.game_state.direction != 'DOWN':
+            self.game_state.update_direction('UP')
+        if action == 'DOWN' and self.game_state.direction != 'UP':
+            self.game_state.update_direction('DOWN')
+        if action == 'LEFT' and self.game_state.direction != 'RIGHT':
+            self.game_state.update_direction('LEFT')
+        if action == 'RIGHT' and self.game_state.direction != 'LEFT':
+            self.game_state.update_direction('RIGHT')
+
+        # Moving the snake
+        if self.game_state.direction == 'UP':
+            self.game_state.snake_position[1] -= 10
+        if self.game_state.direction == 'DOWN':
+            self.game_state.snake_position[1] += 10
+        if self.game_state.direction == 'LEFT':
+            self.game_state.snake_position[0] -= 10
+        if self.game_state.direction == 'RIGHT':
+            self.game_state.snake_position[0] += 10
+
+        self.game_state.update_snake_position(self.game_state.snake_position)
+
+
+    def play_step(self, action):
+        self.game_state.reset_reward()
+        self._move_snake(action)
+
+        # Snake body growing mechanism
+        # if fruits and snakes collide then scores
+        # will be incremented by 10
+        self.game_state.snake_body.insert(0, list(self.game_state.snake_position))
+        if self.game_state.snake_position[0] == self.game_state.fruit_position[0] \
+                and self.game_state.snake_position[1] == self.game_state.fruit_position[1]:
+
+            self.game_state.add_to_score()
+            self.game_state.fruit_spawn = False
+        else:
+            self.game_state.snake_body.pop()
+
+
+
+        if not self.game_state.fruit_spawn:
+            self.game_state.fruit_position = [random.randrange(1, (self.game_state.window_x // 10)) * 10,
+                                              random.randrange(1, (self.game_state.window_y // 10)) * 10]
+
+        self.game_state.fruit_spawn = True
+        self.game_state.update_fruit_position(self.game_state.fruit_position)
+        self.game_window.fill(black)
+
+        for pos in self.game_state.snake_body:
+            pygame.draw.rect(self.game_window, green,
+                             pygame.Rect(pos[0], pos[1], 10, 10))
+            pygame.draw.rect(self.game_window, white, pygame.Rect(
+                             self.game_state.fruit_position[0], self.game_state.fruit_position[1], 10, 10))
+
+        # Game Over conditions
+        if self.game_state.snake_position[0] < 0 \
+                or self.game_state.snake_position[0] > self.game_state.window_x - 10:
+            self.game_over()
+
+        if self.game_state.snake_position[1] < 0 \
+                or self.game_state.snake_position[1] > self.game_state.window_y - 10:
+            self.game_over()
+
+        # Touching the snake body
+        for block in self.game_state.snake_body[1:]:
+            if self.game_state.snake_position[0] == block[0] and self.game_state.snake_position[1] == block[1]:
+                self.game_over()
+
+        # displaying score continuously
+        self.show_score(white, 'times new roman', 20)
+
+        # Refresh game screen
+        pygame.display.update()
+
+        # Frame Per Second /Refresh Rate
+        self.fps.tick(self.game_state.snake_speed)
+
+    def run(self):
         while True:
             # handling key events
+            action = "NONE"
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP:
-                        self.game_state.change_to = 'UP'
+                        action = 'UP'
                     if event.key == pygame.K_DOWN:
-                        self.game_state.change_to = 'DOWN'
+                        action = 'DOWN'
                     if event.key == pygame.K_LEFT:
-                        self.game_state.change_to = 'LEFT'
+                        action = 'LEFT'
                     if event.key == pygame.K_RIGHT:
-                        self.game_state.change_to = 'RIGHT'
+                        action = 'RIGHT'
                     if event.key == pygame.K_ESCAPE:
                         pygame.quit()
                         quit()
 
-            # If two keys pressed simultaneously
-            # we don't want snake to move into two
-            # directions simultaneously
-            if self.game_state.change_to == 'UP' and self.game_state.direction != 'DOWN':
-                self.game_state.update_direction('UP')
-            if self.game_state.change_to == 'DOWN' and self.game_state.direction != 'UP':
-                self.game_state.update_direction('DOWN')
-            if self.game_state.change_to == 'LEFT' and self.game_state.direction != 'RIGHT':
-                self.game_state.update_direction('LEFT')
-            if self.game_state.change_to == 'RIGHT' and self.game_state.direction != 'LEFT':
-                self.game_state.update_direction('RIGHT')
+            self.play_step(action)
 
-            # Moving the snake
-            if self.game_state.direction == 'UP':
-                self.game_state.snake_position[1] -= 10
-            if self.game_state.direction == 'DOWN':
-                self.game_state.snake_position[1] += 10
-            if self.game_state.direction == 'LEFT':
-                self.game_state.snake_position[0] -= 10
-            if self.game_state.direction == 'RIGHT':
-                self.game_state.snake_position[0] += 10
+            print(self.game_state.get_game_state())
 
-            self.game_state.update_snake_position(self.game_state.snake_position)
+            if self.game_state.is_game_over:
+                self.reset()
 
-            # Snake body growing mechanism
-            # if fruits and snakes collide then scores
-            # will be incremented by 10
-            self.game_state.snake_body.insert(0, list(self.game_state.snake_position))
-            if self.game_state.snake_position[0] == self.game_state.fruit_position[0] \
-                    and self.game_state.snake_position[1] == self.game_state.fruit_position[1]:
-                self.game_state.score += 10
-                self.game_state.update_score(self.game_state.score)
-                self.game_state.fruit_spawn = False
-            else:
-                self.game_state.snake_body.pop()
-
-            if not self.game_state.fruit_spawn:
-                self.game_state.fruit_position = [random.randrange(1, (self.game_state.window_x // 10)) * 10,
-                                                  random.randrange(1, (self.game_state.window_y // 10)) * 10]
-
-            self.game_state.fruit_spawn = True
-            self.game_state.update_fruit_position(self.game_state.fruit_position)
-            self.game_window.fill(black)
-
-            for pos in self.game_state.snake_body:
-                pygame.draw.rect(self.game_window, green,
-                                 pygame.Rect(pos[0], pos[1], 10, 10))
-                pygame.draw.rect(self.game_window, white, pygame.Rect(
-                                 self.game_state.fruit_position[0], self.game_state.fruit_position[1], 10, 10))
-
-            # Game Over conditions
-            if self.game_state.snake_position[0] < 0 \
-                    or self.game_state.snake_position[0] > self.game_state.window_x - 10:
-                self.game_over()
-
-            if self.game_state.snake_position[1] < 0 \
-                    or self.game_state.snake_position[1] > self.game_state.window_y - 10:
-                self.game_over()
-
-            # Touching the snake body
-            for block in self.game_state.snake_body[1:]:
-                if self.game_state.snake_position[0] == block[0] and self.game_state.snake_position[1] == block[1]:
-                    self.game_over()
-
-            # displaying score continuously
-            self.show_score(white, 'times new roman', 20)
-
-            # Refresh game screen
-            pygame.display.update()
-
-            # Frame Per Second /Refresh Rate
-            self.fps.tick(self.game_state.snake_speed)
-
-    def run(self):
-        self.__init__()
-        self.play_step()
+            if self.game_state.get_game_state() == 'QUIT':
+                break
