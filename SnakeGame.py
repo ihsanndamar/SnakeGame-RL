@@ -1,6 +1,8 @@
 # importing libraries
 import time
+from enum import Enum
 
+import numpy as np
 import pygame
 import random
 
@@ -14,15 +16,15 @@ red = pygame.Color(255, 0, 0)
 green = pygame.Color(0, 255, 0)
 blue = pygame.Color(0, 0, 255)
 
-# reset func
+
 
 class SnakeGameState:
 
     def __init__(self):
         # define constants
-        self.snake_speed = 15
-        self.window_x = 720
-        self.window_y = 480
+        self.snake_speed = 120
+        self.window_x = 250
+        self.window_y = 150
         self.fruit_spawn = True
         self.direction = 'RIGHT'
         self.change_to = self.direction
@@ -36,6 +38,12 @@ class SnakeGameState:
                                random.randrange(1, (self.window_y // 10)) * 10]
         self.is_game_over = False
         self.reward = 0
+
+
+
+
+
+
 
     def reset_reward(self):
         self.reward = 0
@@ -109,7 +117,7 @@ class SnakeGame:
         # creating a text surface on which text
         # will be drawn
         game_over_surface = my_font.render(
-            'Your self.score is : ' + str(self.game_state.score), True, red)
+            'Score: ' + str(self.game_state.score), True, red)
 
         # create a rectangular object for the text
         # surface object
@@ -122,24 +130,50 @@ class SnakeGame:
         self.game_window.blit(game_over_surface, game_over_rect)
         pygame.display.flip()
 
-        # after 2 seconds we will quit the program
-        time.sleep(2)
-
+        self.game_state.reward = -10
         return self.game_state.get_game_state()
+
+    def is_collision(self, pt=None):
+        if pt is None:
+            pt = self.game_state.snake_position
+
+        if pt[0] >= self.game_state.window_x or pt[0] < 0 or pt[1] >= self.game_state.window_y or pt[1] < 0:
+            return True
+        elif pt in self.game_state.snake_body[1:]:
+            return True
+
+        return False
 
     def _move_snake(self, action):
         # If two keys pressed simultaneously
         # we don't want snake to move into two
         # directions simultaneously
 
-        if action == 'UP' and self.game_state.direction != 'DOWN':
-            self.game_state.update_direction('UP')
-        if action == 'DOWN' and self.game_state.direction != 'UP':
-            self.game_state.update_direction('DOWN')
-        if action == 'LEFT' and self.game_state.direction != 'RIGHT':
-            self.game_state.update_direction('LEFT')
-        if action == 'RIGHT' and self.game_state.direction != 'LEFT':
-            self.game_state.update_direction('RIGHT')
+        clock_wise = ['RIGHT', 'DOWN', 'LEFT', 'UP']
+
+        idx = clock_wise.index(self.game_state.direction)
+
+        if np.array_equal(action, [1, 0, 0]):
+            new_dir = clock_wise[idx]   # no change
+        elif np.array_equal(action, [0, 1, 0]):
+            next_idx = (idx + 1) % 4
+            new_dir = clock_wise[next_idx]  # right turn r -> d -> l -> u
+        else: # [0, 0, 1]
+            next_idx = (idx - 1) % 4
+            new_dir = clock_wise[next_idx]  # left turn r -> u -> l -> d
+
+        self.game_state.direction = new_dir
+
+        # if action == 'UP' and self.game_state.direction != 'DOWN':
+        #     self.game_state.update_direction('UP')
+        # if action == 'DOWN' and self.game_state.direction != 'UP':
+        #     self.game_state.update_direction('DOWN')
+        # if action == 'LEFT' and self.game_state.direction != 'RIGHT':
+        #     self.game_state.update_direction('LEFT')
+        # if action == 'RIGHT' and self.game_state.direction != 'LEFT':
+        #     self.game_state.update_direction('RIGHT')
+
+
 
         # Moving the snake
         if self.game_state.direction == 'UP':
@@ -153,9 +187,9 @@ class SnakeGame:
 
         self.game_state.update_snake_position(self.game_state.snake_position)
 
-
     def play_step(self, action):
         self.game_state.reset_reward()
+
         self._move_snake(action)
 
         # Snake body growing mechanism
@@ -169,8 +203,6 @@ class SnakeGame:
             self.game_state.fruit_spawn = False
         else:
             self.game_state.snake_body.pop()
-
-
 
         if not self.game_state.fruit_spawn:
             self.game_state.fruit_position = [random.randrange(1, (self.game_state.window_x // 10)) * 10,
